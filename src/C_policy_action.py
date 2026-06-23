@@ -59,43 +59,43 @@ def _follow_up_action(row: pd.Series) -> str:
 
 
 def _reason_text(row: pd.Series) -> str:
-    shortage_phrase = (
-        "리드타임 대비 필요 커버에 부족합니다."
+    cover_note = (
+        "coverage below required lead-time+safety-stock level"
         if row["inventory_cover_month"] < row["required_cover_month"]
-        else "리드타임 대비 필요 커버는 충족합니다."
+        else "coverage meets required lead-time+safety-stock level"
     )
-    moq_phrase = (
-        "계획 물량이 MOQ에 미달해 묶음 발주 또는 MOQ 협상이 필요합니다."
+    moq_note = (
+        "MOQ shortfall: bundle order or negotiate MOQ"
         if not row["moq_check"]
-        else "계획 물량은 MOQ 기준을 충족합니다."
+        else "MOQ requirement met"
     )
-    second_source_phrase = (
-        f"2nd Source는 {row['second_source_country']} 기준 준비되어 있습니다."
+    second_source_note = (
+        f"2nd Source ready in {row['second_source_country']}"
         if _as_bool(row["second_source_ready"])
-        else f"2nd Source({row['second_source_country']}) 준비가 미흡해 공급선 다변화 검토가 필요합니다."
+        else f"2nd Source not ready in {row['second_source_country']}"
     )
-    doc_phrase = (
-        "서류 준비 완료"
-        if _as_bool(row["document_ready"])
-        else "서류 미완료"
-    )
+    doc_note = "documents ready" if _as_bool(row["document_ready"]) else "documents not ready"
 
-    return (
-        f"{row['item_name']} 재고커버는 {row['inventory_cover_month']:.1f}개월이고 "
-        f"필요 커버는 {row['required_cover_month']:.1f}개월입니다. {shortage_phrase} "
-        f"Landed Cost는 {row['landed_cost_krw_per_ton']:,.0f}원/톤, 최근 부담 변화는 "
-        f"{row['landed_cost_change_pct']:.1f}%입니다. "
-        f"forecast market signal은 {row['market_signal']}이며 3개월 전망 "
-        f"{row['forecast_price_change_3m_pct']:.1f}%, 12개월 전망 "
-        f"{row['forecast_price_change_12m_pct']:.1f}%입니다. "
-        f"ETD {row['etd_date']}, ETA {row['eta_date']}, 통관 예정 "
-        f"{row['customs_clearance_expected_date']}, 국내 입고 예정 "
-        f"{row['domestic_inbound_expected_date']}이고 {doc_phrase}, "
-        f"입고 지연 예상은 {row['inbound_delay_days']}일입니다. "
-        f"{second_source_phrase} {moq_phrase} "
-        f"따라서 primary_action은 {row['primary_action']}, follow_up_action은 "
-        f"{row['follow_up_action']}로 추천합니다."
-    )
+    reasons = [
+        f"inventory cover {row['inventory_cover_month']:.1f}M vs required cover {row['required_cover_month']:.1f}M",
+        cover_note,
+        f"Landed Cost {row['landed_cost_krw_per_ton']:.0f} KRW/ton with change {row['landed_cost_change_pct']:.1f}%",
+        (
+            f"forecast market signal {row['market_signal']} "
+            f"3M {row['forecast_price_change_3m_pct']:.1f}% "
+            f"12M {row['forecast_price_change_12m_pct']:.1f}%"
+        ),
+        (
+            f"ETD {row['etd_date']} ETA {row['eta_date']} "
+            f"customs {row['customs_clearance_expected_date']} "
+            f"domestic inbound {row['domestic_inbound_expected_date']} "
+            f"{doc_note} inbound delay {row['inbound_delay_days']}D"
+        ),
+        second_source_note,
+        moq_note,
+        f"primary_action {row['primary_action']} follow_up_action {row['follow_up_action']}",
+    ]
+    return " / ".join(str(reason).replace("\r", " ").replace("\n", " ").strip() for reason in reasons)
 
 
 def recommend_purchase_actions(

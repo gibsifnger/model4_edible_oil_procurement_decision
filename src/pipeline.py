@@ -38,6 +38,13 @@ def run_pipeline(
     state_df = build_current_purchase_state(market_df, cfg)
     interpreted_df = interpret_risk_signals(state_df, cfg)
     action_df = recommend_purchase_actions(interpreted_df, cfg)
+    action_df["reason_text"] = (
+        action_df["reason_text"]
+        .astype(str)
+        .str.replace(r"[\r\n]+", " ", regex=True)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
 
     output_df = action_df[SUMMARY_COLUMNS].sort_values(
         ["total_risk_score", "item_name"],
