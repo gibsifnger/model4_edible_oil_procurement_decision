@@ -1,0 +1,5 @@
+as_of_month,item_name,origin_country,current_inventory_ton,monthly_usage_forecast_ton,open_po_ton,lead_time_month,supplier_moq_ton,planned_order_ton,price_change_3m_pct,price_volatility_score,fx_change_1m_pct,freight_change_1m_pct,supplier_reliability_score,origin_disruption_score,customs_delay_risk_score
+2026-06-01,팜유,말레이시아,950,1200,300,2.0,500,700,8.5,68,2.4,5.1,72,55,48
+2026-06-01,대두유,미국,2100,900,600,2.5,400,300,3.2,44,1.1,2.5,86,25,30
+2026-06-01,해바라기유,우크라이나,500,650,100,3.0,300,500,11.8,82,2.8,6.7,58,82,62
+2026-06-01,야자유,필리핀,780,520,0,2.0,250,200,-1.5,35,0.7,1.8,76,36,78

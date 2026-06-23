@@ -1,170 +1,101 @@
-# Model2 Procurement Decision Pipeline
+# Model4 Edible Oil Procurement Decision
 
-구매/SCM 의사결정을 위한 end-to-end 파이프라인입니다. 단순 가격 예측 모델이 아니라, 외생 데이터로 현재 구매 상태를 만들고, 위험과 기회를 해석한 뒤, 회사 운영 기준에 맞는 정책 후보를 비교해 최종 액션을 추천하는 구조입니다.
+롯데웰푸드 원물/소싱팀의 유지 구매관리 업무를 가정한 구매 의사결정 지원 파이프라인입니다. 이 프로젝트는 가격을 맞히는 예측 모델이 아니라, 시장 입력과 운영 제약을 바탕으로 지금 구매 상태를 만들고 위험/기회 신호를 해석한 뒤 실행 가능한 구매 액션을 추천하는 MVP입니다.
 
-## What This Project Shows
+데이터는 실제 회사 데이터가 아닌 synthetic/demo 데이터입니다. 따라서 결과는 업무 사고방식과 데이터 파이프라인 구조를 보여주기 위한 예시이며, 실거래 의사결정에 바로 사용할 수 없습니다.
 
-이 프로젝트는 구매 담당자가 반복적으로 마주치는 질문을 데이터 파이프라인으로 구조화합니다.
+## 업무 연결
 
-- 지금 구매 장면은 어떤 상태인가?
-- 위험 또는 기회로 판단하는 근거는 무엇인가?
-- 실행 가능한 구매 정책 후보는 무엇인가?
-- 회사의 MOQ, 창고, 운전자본, 입고 시점 기준을 통과하는가?
-- 여러 시나리오에서 어떤 후보가 가장 견고한가?
-- 최종적으로 구매, 관망, 추가 확인 중 무엇을 선택해야 하는가?
+이 파이프라인은 채용공고의 주요 업무와 다음처럼 연결됩니다.
 
-## Decision Architecture
+- 원부자재 구매계획/발주: 품목별 재고 커버, 리드타임 갭, MOQ 충족 여부로 발주 필요성을 판단합니다.
+- 시황 분석: 가격 변동, 환율, 운임, 산지 리스크를 점수화해 구매 타이밍 판단 근거로 사용합니다.
+- 협력사 관리/단가협상: 공급 안정성, MOQ 미달, 가격 리스크를 기반으로 협력사 확인 또는 단가 협상 액션을 분리합니다.
+- 수급/재고관리: 결품 예상 여부와 재고 커버 개월 수를 중심으로 BUY_NOW, SPLIT_ORDER, WAIT를 추천합니다.
+- 수입/통관: 통관 지연 리스크가 높은 품목은 CHECK_CUSTOMS_RISK로 별도 점검합니다.
+- 데이터 분석: CSV 입력에서 상태, 리스크, 액션, reason_text까지 추적 가능한 테이블을 생성합니다.
 
-### A. State Layer
-
-현재 구매 장면과 운영 상태를 생성합니다.
-
-- 외생 데이터 입력
-- 월별 기준 상태 생성
-- baseline no-buy 흐름 계산
-- shortage helper 및 재고 흐름 구성
-
-### B. Interpret Layer
-
-상태를 판단 가능한 신호로 해석합니다.
-
-- 모델 feature 생성
-- Target A / Target B scoring
-- 필요 구매 신호 해석
-- 위험/기회 판단 근거 구성
-
-### C. Policy Action Layer
-
-회사 기준으로 실행 가능한 액션을 선택합니다.
-
-- 후보 정책 생성
-- 운영 gate 판단
-- 시나리오 시뮬레이션
-- 후보 비교와 최종 액션 추천
-
-## Pipeline Flow
+## 의사결정 흐름
 
 ```text
-External inputs
-  -> State generation
-  -> Judgment interpretation
-  -> Candidate policy generation
-  -> Operating gate check
-  -> Scenario simulation
-  -> Robust candidate selection
-  -> Final action recommendation
+data/edible_oil_market_inputs_demo.csv
+  -> A_state: 현재 구매상태 생성
+  -> B_interpret: 위험/기회 신호 해석
+  -> C_policy_action: 구매 액션 추천
+  -> outputs/edible_oil_purchase_decision_summary.csv
 ```
 
-## Repository Structure
+### A_state
+
+- `inventory_cover_month`: 현재 재고와 예정 입고가 몇 개월 수요를 커버하는지 계산
+- `lead_time_gap_month`: 리드타임 대비 재고 커버 부족분 계산
+- `shortage_expected`: 리드타임과 안전 버퍼를 고려한 결품 예상 여부
+- `moq_check`: 계획 발주량이 공급사 MOQ 기준을 만족하는지 확인
+
+### B_interpret
+
+- `price_risk_score`
+- `fx_freight_risk_score`
+- `supply_risk_score`
+- `shortage_risk_score`
+- `total_risk_score`
+
+### C_policy_action
+
+추천 액션은 다음 중 하나입니다.
+
+- `BUY_NOW`: 결품 위험이 커서 즉시 구매
+- `SPLIT_ORDER`: 가격/환율/운임 변동성이 높아 분할 구매
+- `WAIT`: 현재는 관망
+- `NEGOTIATE_PRICE`: 단가 협상 또는 견적 재확인
+- `CHECK_SUPPLIER`: 협력사 납기/대체 공급처 확인
+- `CHECK_CUSTOMS_RISK`: 선적/서류/통관 지연 위험 확인
+
+각 추천에는 사람이 읽을 수 있는 `reason_text`가 함께 생성됩니다.
+
+## 폴더 구조
 
 ```text
-.
+model4_edible_oil_procurement_decision
 ├─ README.md
 ├─ requirements.txt
-├─ .gitignore
-├─ run_all_in_one_hgb_pipeline.py
-├─ build_external_inputs.py
+├─ run_pipeline.py
 ├─ data/
-│  ├─ actual_external_inputs_monthly_2023_01_to_2026_08_working.csv
-│  └─ actual_external_inputs_monthly_2023_01_to_2026_08_notes.txt
-├─ docs/
-│  ├─ model2_column_map_and_candidate_patch.md
-│  ├─ model2_dataflow_dictionary.xlsx
-│  ├─ refactor_notes.md
-│  ├─ migration_delete_checklist.md
-│  ├─ rearrange.md
-│  └─ start.md
+│  └─ edible_oil_market_inputs_demo.csv
 ├─ outputs/
 │  └─ .gitkeep
-├─ artifacts/
-│  └─ .gitkeep
-└─ model2_pipeline/
-   ├─ A_state/
-   ├─ B_interpret/
-   ├─ C_policy_action/
+└─ src/
    ├─ config.py
+   ├─ A_state.py
+   ├─ B_interpret.py
+   ├─ C_policy_action.py
    └─ pipeline.py
 ```
 
-## Main Scripts
-
-### `run_all_in_one_hgb_pipeline.py`
-
-전체 의사결정 파이프라인을 실행하는 메인 스크립트입니다.
-
-지원 모드:
-
-- `--external-mode demo`
-- `--external-mode csv`
-- `--external-mode build`
-
-주요 옵션:
-
-- `--decision-month`
-- `--demo-months`
-- `--external-csv-path`
-- `--save-outputs`
-- `--save-artifacts`
-- `--use-saved-artifacts`
-- `--prediction-combine-mode`
-
-### `build_external_inputs.py`
-
-구매 판단에 필요한 월별 외생 입력 데이터를 구성하는 스크립트입니다.
-
-주요 입력 축:
-
-- 원재료 가격
-- 환율
-- 운임 지수
-
-## Quick Start
-
-### 1. Install Dependencies
+## 실행 방법
 
 ```bash
 pip install -r requirements.txt
+python run_pipeline.py
 ```
 
-### 2. Run Demo Mode
+실행 후 결과 파일이 생성됩니다.
 
-처음 실행할 때는 저장된 모델 artifact가 없을 수 있으므로 `--fresh-fit`을 사용합니다. Demo mode의 현재 예시 데이터는 `2022-04-01`까지의 decision month를 포함합니다.
-
-```bash
-python run_all_in_one_hgb_pipeline.py --external-mode demo --demo-months 44 --decision-month 2022-04-01 --save-outputs --fresh-fit
+```text
+outputs/edible_oil_purchase_decision_summary.csv
 ```
 
-### 3. Run CSV Mode
+## 입력 품목
 
-```bash
-python run_all_in_one_hgb_pipeline.py --external-mode csv --external-csv-path data/actual_external_inputs_monthly_2023_01_to_2026_08_working.csv --decision-month 2026-04-01 --save-outputs --fresh-fit
-```
+데모 데이터에는 유지 구매관리 관점의 네 가지 품목이 포함됩니다.
 
-저장된 모델 artifact를 재사용하려면 `--model-a-path`와 `--model-b-path`를 함께 지정합니다.
+- 팜유
+- 대두유
+- 해바라기유
+- 야자유
 
-## Key Outputs
+## 이력서 3줄 요약
 
-`--save-outputs` 옵션을 사용하면 `outputs/`에 주요 DataFrame이 CSV로 저장됩니다.
-
-- `meta_df`
-- `exogenous_df`
-- `historical_master_df`
-- `scored_latest_df`
-- `baseline_flow_df`
-- `candidate_df`
-- `gated_candidate_df`
-- `simulation_result_df`
-- `scenario_summary_df`
-- `robust_summary_df`
-- `best_candidate_df`
-- `final_decision_df`
-
-## Portfolio Perspective
-
-이 프로젝트는 구매/SCM 업무를 다음 세 가지 관점으로 분리해 보여줍니다.
-
-- 상태 생성: 외생 변수와 운영 데이터를 구매 판단 가능한 상태로 변환
-- 판단 해석: 예측 결과와 rule signal을 결합해 위험/기회 근거 구성
-- 정책 행동: 실행 가능한 후보만 gate로 걸러내고 시나리오 기반으로 최종 액션 선택
-
-따라서 결과물은 "예측값" 하나가 아니라, 구매 의사결정에 필요한 상태, 근거, 후보, 제약, 시뮬레이션, 추천 액션을 함께 제공합니다.
+- 유지 원물 구매 업무를 가정해 재고, 리드타임, MOQ, 가격/환율/운임, 공급/통관 리스크를 통합한 구매 의사결정 파이프라인을 구축했습니다.
+- 기존 복잡한 모델 구조를 A_state, B_interpret, C_policy_action 3단계로 재설계해 상태 생성, 리스크 해석, 실행 액션 추천 흐름을 명확히 했습니다.
+- synthetic/demo 데이터를 활용해 BUY_NOW, SPLIT_ORDER, WAIT, NEGOTIATE_PRICE, CHECK_SUPPLIER, CHECK_CUSTOMS_RISK 액션과 한글 설명 문구를 자동 생성했습니다.
