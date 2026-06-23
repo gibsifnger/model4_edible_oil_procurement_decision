@@ -1,0 +1,9 @@
+This CSV uses public monthly actual values where available, then forward-fills the latest actual for unavailable future months.
+Sources:
+- Sugar: FRED series PSUGAISAUSDM, actual through 2026-02.
+- USDKRW: FRED series EXKOUS, actual through 2026-03.
+- Freight: FRED series FRGEXPUSM649NCIS (Cass Freight Index: Expenditures), actual through 2026-02.
+Forward-filled months:
+- Sugar: 2026-03 to 2026-08 forward-filled from 2026-02.
+- USDKRW: 2026-04 to 2026-08 forward-filled from 2026-03.
+- Freight: 2026-03 to 2026-08 forward-filled from 2026-02.
