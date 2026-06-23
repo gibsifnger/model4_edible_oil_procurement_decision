@@ -20,6 +20,7 @@ class ProcurementConfig:
     high_risk_threshold: float = 70.0
     medium_risk_threshold: float = 45.0
     moq_tolerance: float = 0.85
+    default_usdkrw: float = 1380.0
 
 
 DEFAULT_CONFIG = ProcurementConfig()

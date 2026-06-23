@@ -1,33 +1,21 @@
 # Model4 Edible Oil Procurement Decision
 
-롯데웰푸드 원물/소싱팀의 유지 구매관리 업무를 가정한 구매 의사결정 지원 파이프라인입니다. 이 프로젝트는 가격을 맞히는 예측 모델이 아니라, 시장 입력과 운영 제약을 바탕으로 지금 구매 상태를 만들고 위험/기회 신호를 해석한 뒤 실행 가능한 구매 액션을 추천하는 MVP입니다.
+롯데웰푸드 원물/소싱팀의 유지 구매관리 포지션을 가정한 구매 의사결정 MVP입니다.
 
-데이터는 실제 회사 데이터가 아닌 synthetic/demo 데이터입니다. 따라서 결과는 업무 사고방식과 데이터 파이프라인 구조를 보여주기 위한 예시이며, 실거래 의사결정에 바로 사용할 수 없습니다.
+이 모델은 롯데웰푸드 AI 구매 어시스턴트 같은 시황 예측값을 대체하는 것이 아니라, 예측값을 실제 구매 실행 기준으로 연결하는 구매 의사결정 파이프라인입니다. 핵심은 원재료 가격 예측 자체가 아니라, 시황/환율/운임/재고/Open PO/입항/통관/2nd Source/Landed Cost를 한 표에서 보고 `BUY_NOW`, `SPLIT_ORDER`, `WAIT`, `CHECK` 계열 액션으로 변환하는 것입니다.
+
+데이터는 실제 회사 데이터가 아닌 synthetic/demo 데이터입니다. 결과는 구매 업무 사고방식과 데이터 파이프라인 구조를 보여주기 위한 예시이며, 실거래 의사결정에 바로 사용할 수 없습니다.
 
 ## 업무 연결
 
-이 파이프라인은 채용공고의 주요 업무와 다음처럼 연결됩니다.
-
-- 원부자재 구매계획/발주: 품목별 재고 커버, 리드타임 갭, MOQ 충족 여부로 발주 필요성을 판단합니다.
-- 시황 분석: 가격 변동, 환율, 운임, 산지 리스크를 점수화해 구매 타이밍 판단 근거로 사용합니다.
-- 협력사 관리/단가협상: 공급 안정성, MOQ 미달, 가격 리스크를 기반으로 협력사 확인 또는 단가 협상 액션을 분리합니다.
-- 수급/재고관리: 결품 예상 여부와 재고 커버 개월 수를 중심으로 BUY_NOW, SPLIT_ORDER, WAIT를 추천합니다.
-- 수입/통관: 통관 지연 리스크가 높은 품목은 CHECK_CUSTOMS_RISK로 별도 점검합니다.
-- 데이터 분석: CSV 입력에서 상태, 리스크, 액션, reason_text까지 추적 가능한 테이블을 생성합니다.
-
-## 결과 예시
-
-아래는 demo 데이터 기준으로 생성되는 유지 구매 의사결정 결과 예시입니다.
-
-| 품목 | 재고커버개월 | 종합 리스크 점수 | 추천 액션 | 판단 요약 |
-|---|---:|---:|---|---|
-| 팜유 | 1.0 | 82 | SPLIT_ORDER | 가격·환율·운임 부담이 높고 재고커버가 낮아 분할 발주 검토 |
-| 대두유 | 3.0 | 38 | WAIT | 재고 여유가 있고 단기 수급 리스크가 낮아 관망 가능 |
-| 해바라기유 | 0.9 | 78 | CHECK_SUPPLIER | 재고커버가 낮고 공급 안정성 확인이 필요 |
-| 야자유 | 1.5 | 71 | CHECK_CUSTOMS_RISK | 통관 지연 가능성이 있어 선적·통관 일정 우선 확인 필요 |
-
-> 실제 수치는 demo/synthetic 데이터 기준이며, 실거래 단가·실제 공급사 정보는 포함하지 않았습니다.
-
+| 업무 영역 | 파이프라인 반영 방식 |
+|---|---|
+| 원부자재 구매계획/발주 | 재고 커버, 리드타임, 안전재고, MOQ 기준으로 구매 필요성을 판단 |
+| 시황 분석 | 가격 변화, forecast market signal, 환율/운임 리스크를 구매 액션으로 연결 |
+| 원가율 방어 | `landed_cost_krw_per_ton`, 관세, 통관비, 내륙운송비, 창고비를 반영 |
+| 협력사 관리 | 공급 안정성, 주 공급사, 2nd Source 준비 여부를 점검 |
+| 수입/통관 | ETD, ETA, 서류 준비, 통관 예정일, 국내 입고 예정일, 지연 일수를 반영 |
+| 데이터 분석 | CSV 입력에서 상태, 리스크, 액션, reason_text까지 추적 가능한 결과 생성 |
 
 ## 의사결정 흐름
 
@@ -39,33 +27,69 @@ data/edible_oil_market_inputs_demo.csv
   -> outputs/edible_oil_purchase_decision_summary.csv
 ```
 
-### A_state
+## A_state
 
-- `inventory_cover_month`: 현재 재고와 예정 입고가 몇 개월 수요를 커버하는지 계산
-- `lead_time_gap_month`: 리드타임 대비 재고 커버 부족분 계산
-- `shortage_expected`: 리드타임과 안전 버퍼를 고려한 결품 예상 여부
-- `moq_check`: 계획 발주량이 공급사 MOQ 기준을 만족하는지 확인
+현재 구매 상태를 만듭니다.
 
-### B_interpret
+| 컬럼 | 의미 |
+|---|---|
+| `landed_cost_krw_per_ton` | 계약가, 관세, 통관비, 내륙운송비, 창고비를 반영한 톤당 도착원가 |
+| `inbound_status` | Open PO 입고 일정 상태: `ON_TRACK`, `WATCH`, `AT_RISK` |
+| `effective_available_inventory_ton` | 입고 리스크를 반영한 실질 가용 재고 |
+| `at_risk_open_po_ton` | 입고 리스크가 있는 Open PO 물량 |
+| `required_cover_month` | `lead_time_month + safety_stock_month` |
+| `shortage_expected` | 필요 커버 개월 수 대비 재고 부족 여부 |
 
-- `price_risk_score`
-- `fx_freight_risk_score`
-- `supply_risk_score`
-- `shortage_risk_score`
-- `total_risk_score`
+## B_interpret
 
-### C_policy_action
+구매 판단에 필요한 리스크 점수를 계산합니다.
 
-추천 액션은 다음 중 하나입니다.
+| 컬럼 | 의미 |
+|---|---|
+| `price_risk_score` | 최근 가격 상승과 변동성 리스크 |
+| `fx_freight_risk_score` | 환율 및 운임 리스크 |
+| `supply_risk_score` | 공급사 신뢰도, 산지 리스크, 통관 리스크 |
+| `shortage_risk_score` | 재고 커버와 리드타임 부족 리스크 |
+| `landed_cost_risk_score` | Landed Cost 상승 부담 |
+| `forecast_risk_score` | 3개월/12개월 전망과 forecast market signal |
+| `inbound_risk_score` | ETD/ETA/서류/통관/입고 지연 리스크 |
+| `second_source_risk_score` | 2nd Source, 규격 승인, 식품안전 서류 준비 리스크 |
+| `total_risk_score` | 위 점수를 가중합한 종합 리스크 |
 
-- `BUY_NOW`: 결품 위험이 커서 즉시 구매
-- `SPLIT_ORDER`: 가격/환율/운임 변동성이 높아 분할 구매
-- `WAIT`: 현재는 관망
-- `NEGOTIATE_PRICE`: 단가 협상 또는 견적 재확인
-- `CHECK_SUPPLIER`: 협력사 납기/대체 공급처 확인
-- `CHECK_CUSTOMS_RISK`: 선적/서류/통관 지연 위험 확인
+## C_policy_action
 
-각 추천에는 사람이 읽을 수 있는 `reason_text`가 함께 생성됩니다.
+최종 추천은 실행 우선순위를 분리합니다.
+
+| 컬럼 | 의미 |
+|---|---|
+| `primary_action` | 지금 가장 먼저 취할 구매 액션 |
+| `follow_up_action` | 함께 확인해야 하는 후속 액션 |
+| `recommended_action` | 기존 호환성을 위한 컬럼이며 `primary_action`과 동일 |
+| `recommended_order_ton` | 즉시 구매 또는 분할 구매 시 권장 발주량 |
+| `reason_text` | 구매 담당자가 읽을 수 있는 판단 근거 |
+
+액션 후보는 다음과 같습니다.
+
+- `BUY_NOW`
+- `SPLIT_ORDER`
+- `WAIT`
+- `NEGOTIATE_PRICE`
+- `CHECK_SUPPLIER`
+- `CHECK_CUSTOMS_RISK`
+- `SECOND_SOURCE_REVIEW`
+- `INBOUND_SCHEDULE_CHECK`
+- `LANDED_COST_REVIEW`
+
+## 결과 예시
+
+아래 표는 demo 데이터 기준 예시입니다. 실제 실행 결과는 `outputs/edible_oil_purchase_decision_summary.csv`에서 확인할 수 있습니다.
+
+| item_name | origin_country | inventory_cover_month | required_cover_month | total_risk_score | risk_level | primary_action | follow_up_action |
+|---|---|---:|---:|---:|---|---|---|
+| 해바라기유 | 우크라이나 | 0.77 | 4.20 | 90.1 | HIGH | BUY_NOW | INBOUND_SCHEDULE_CHECK |
+| 팜유 | 말레이시아 | 0.92 | 3.20 | 70.9 | HIGH | SPLIT_ORDER | INBOUND_SCHEDULE_CHECK |
+| 야자유 | 필리핀 | 1.50 | 3.20 | 62.9 | MEDIUM | INBOUND_SCHEDULE_CHECK | CHECK_CUSTOMS_RISK |
+| 대두유 | 미국 | 3.00 | 3.70 | 42.4 | LOW | WAIT | NONE |
 
 ## 폴더 구조
 
@@ -77,7 +101,8 @@ model4_edible_oil_procurement_decision
 ├─ data/
 │  └─ edible_oil_market_inputs_demo.csv
 ├─ outputs/
-│  └─ .gitkeep
+│  ├─ .gitkeep
+│  └─ edible_oil_purchase_decision_summary.csv
 └─ src/
    ├─ config.py
    ├─ A_state.py
@@ -93,12 +118,6 @@ pip install -r requirements.txt
 python run_pipeline.py
 ```
 
-실행 후 결과 파일이 생성됩니다.
-
-```text
-outputs/edible_oil_purchase_decision_summary.csv
-```
-
 ## 입력 품목
 
 데모 데이터에는 유지 구매관리 관점의 네 가지 품목이 포함됩니다.
@@ -110,6 +129,6 @@ outputs/edible_oil_purchase_decision_summary.csv
 
 ## 이력서 3줄 요약
 
-- 유지 원물 구매 업무를 가정해 재고, 리드타임, MOQ, 가격/환율/운임, 공급/통관 리스크를 통합한 구매 의사결정 파이프라인을 구축했습니다.
-- 기존 복잡한 모델 구조를 A_state, B_interpret, C_policy_action 3단계로 재설계해 상태 생성, 리스크 해석, 실행 액션 추천 흐름을 명확히 했습니다.
-- synthetic/demo 데이터를 활용해 BUY_NOW, SPLIT_ORDER, WAIT, NEGOTIATE_PRICE, CHECK_SUPPLIER, CHECK_CUSTOMS_RISK 액션과 한글 설명 문구를 자동 생성했습니다.
+- 유지 원물 구매 업무를 가정해 재고, Open PO, 입항/통관 일정, 2nd Source, Landed Cost를 통합한 구매 의사결정 파이프라인을 구축했습니다.
+- AI 시황 예측값을 대체하는 모델이 아니라, forecast signal을 실제 구매 실행 기준과 연결해 `BUY_NOW`, `SPLIT_ORDER`, `WAIT`, `CHECK` 액션으로 변환했습니다.
+- synthetic/demo 데이터를 기반으로 A_state, B_interpret, C_policy_action 3단계 구조와 한글 reason_text를 구현해 구매 실무형 의사결정 흐름을 보여주었습니다.
