@@ -15,6 +15,7 @@ env/
 
 outputs/*
 !outputs/.gitkeep
+!outputs/edible_oil_purchase_decision_summary.csv
 
 artifacts/*
 !artifacts/.gitkeep
