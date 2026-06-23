@@ -125,7 +125,8 @@ def build_current_purchase_state(
     # [REAL DATA REPLACEMENT] SAP 계약단가, 환율 테이블, 관세 DB, 물류비 정산 데이터.
     # [INTERVIEW CHECK] "가격 예측이 아니라 Landed Cost 기반 구매 판단"이라고 설명한다.
     # ============================================================
-    usdkrw = out["usdkrw"] if "usdkrw" in out.columns else cfg.default_usdkrw
+    out["usd_krw"] = out["usd_krw"] if "usd_krw" in out.columns else cfg.default_usdkrw
+    usdkrw = out["usd_krw"]
     base_cost = out["contract_price_usd_per_ton"] * usdkrw
     tariff_cost = base_cost * (out["tariff_rate_pct"] / 100)
     out["landed_cost_krw_per_ton"] = (
@@ -182,6 +183,8 @@ def build_current_purchase_state(
     out["shortage_expected"] = out["inventory_cover_month"] < out["required_cover_month"]
 
     # 계획 발주량이 공급사 MOQ에 미달하면 단독 발주가 어려워 묶음 발주나 MOQ 협상이 필요하다.
-    out["moq_check"] = out["planned_order_ton"] >= (out["supplier_moq_ton"] * cfg.moq_tolerance)
+    out["moq_shortfall_ton"] = (out["supplier_moq_ton"] - out["planned_order_ton"]).clip(lower=0)
+    out["moq_check"] = out["planned_order_ton"] >= out["supplier_moq_ton"]
+    out["moq_status"] = np.where(out["moq_check"], "MOQ_OK", "MOQ_SHORTFALL")
 
     return out

@@ -128,6 +128,8 @@ def _follow_up_action(row: pd.Series) -> str:
     for action, should_check in checks:
         if should_check and action != row["primary_action"]:
             return action
+    if row["primary_action"] != "WAIT" and row.get("moq_status") == "MOQ_SHORTFALL":
+        return "CHECK_SUPPLIER"
     return "NONE"
 
 
@@ -152,8 +154,11 @@ def _reason_text(row: pd.Series) -> str:
         else "coverage meets required lead-time+safety-stock level"
     )
     moq_note = (
-        "MOQ shortfall: bundle order or negotiate MOQ"
-        if not row["moq_check"]
+        (
+            "계획 발주량이 공급사 MOQ보다 낮아 실제 발주 전 수량 조정 또는 공급사 MOQ 협의가 필요합니다 "
+            f"(shortfall {row['moq_shortfall_ton']:.0f} ton)"
+        )
+        if row.get("moq_status") == "MOQ_SHORTFALL"
         else "MOQ requirement met"
     )
     second_source_note = (

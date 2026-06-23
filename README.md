@@ -118,6 +118,13 @@ pip install -r requirements.txt
 python run_pipeline.py
 ```
 
+## 데이터 정합성 메모
+
+- Landed Cost는 demo CSV의 `usd_krw`를 우선 사용해 계산합니다.
+- 실제 적용 시 `usd_krw`는 ERP 기준환율, 수입신고 기준환율, 계약일 환율, 선적일 환율 등 회사 기준에 맞춰 교체할 수 있습니다.
+- `planned_order_ton`이 `supplier_moq_ton`보다 작으면 실제 발주 가능 수량이 아니므로, 공급사 MOQ 협의, 수량 조정, 묶음 선적, 또는 관망 판단이 필요합니다.
+- 이 모델은 가격 예측 모델이 아니라 가격/환율/운임/재고/Open PO/통관/MOQ/Landed Cost를 구매 액션으로 변환하는 의사결정 파이프라인입니다.
+
 ## 입력 품목
 
 데모 데이터에는 유지 구매관리 관점의 네 가지 품목이 포함됩니다.

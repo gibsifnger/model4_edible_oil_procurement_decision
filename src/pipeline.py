@@ -37,6 +37,7 @@ SUMMARY_COLUMNS = [
     "as_of_month",
     "item_name",
     "origin_country",
+    "usd_krw",
     "inventory_cover_month",
     "required_cover_month",
     "landed_cost_krw_per_ton",
@@ -50,6 +51,8 @@ SUMMARY_COLUMNS = [
     "follow_up_action",
     "recommended_action",
     "recommended_order_ton",
+    "moq_status",
+    "moq_shortfall_ton",
     "reason_text",
 ]
 
